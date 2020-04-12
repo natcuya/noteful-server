@@ -1,98 +1,91 @@
-const path = require('path')
-const express = require('express')
-const xss = require('xss')
-const FoldersService = require('./folders-service')
+const path = require('path');
+const express = require('express');
+const FoldersService = require('./folders-service');
 
-const foldersRouter = express.Router()
-const jsonParser = express.json()
+const FoldersRouter = express.Router();
+const jsonParser = express.json();
+
+const xss = require('xss');
 
 const serializeFolder = folder => ({
-  id: folder.id,
-  folder_name: xss(folder.folder_name)
-})
+  id: Number(xss(folder.id)),
+  title: xss(folder.title),
+});
 
-foldersRouter
-  .route('/')
-  .get((req, res, next) => {
-    const knexInstance = req.app.get('db')
+FoldersRouter.route('/folders')
+  .get( (req, res, next) => {
+    const knexInstance = req.app.get('db');
     FoldersService.getAllFolders(knexInstance)
       .then(folders => {
-        res.json(folders.map(serializeFolder))
+        res.json(folders.map(serializeFolder));
       })
-      .catch(next)
+      .catch(next);
   })
   .post(jsonParser, (req, res, next) => {
-    const { folder_name } = req.body
-    const newFolder = { folder_name }
-
-    if(!folder_name) {
-      return res.status(400).json({
-        error: { message: `Missing folder_name in request body`}
-      })
+    const knexInstance = req.app.get('db');
+    const {title} = req.body;
+    const newFolder = {title};
+    for (const [key, value] of Object.entries(newFolder)) {
+      if (value === null) {
+        return res.status(400).json({
+          error: {message: `Missing ${key} in request body.`}
+        });
+      }
     }
-
-    FoldersService.insertFolder(
-      req.app.get('db'),
-      newFolder
-    )
+    FoldersService.insertFolder(knexInstance, newFolder)
       .then(folder => {
-        res
-          .status(201)
+        res.status(201)
           .location(path.posix.join(req.originalUrl, `/${folder.id}`))
-          .json(serializeFolder(folder))
+          .json(serializeFolder(folder));
       })
-  })
+      .catch(next);
+  });
 
-foldersRouter
-  .route('/:id')
-  .all((req, res, next) => {
-    FoldersService.getFolderById(
-      req.app.get('db'),
-      req.params.id
-    )
+FoldersRouter.route('/folders/:folderId')
+  .all( (req, res, next) => {
+    const knexInstance = req.app.get('db');
+    const folderId = req.params.folderId;
+    FoldersService.getById(knexInstance, folderId)
       .then(folder => {
-        if (!folder) {
+        if(!folder){
           return res.status(404).json({
-            error: { message: `Folder doesn't exist`}
-          })
+            error: {message: 'Folder does not exist.'}
+          });
         }
-        res.folder = folder
-        next()
+        res.folder = folder;
+        next();
       })
-      .catch(next)
+      .catch(next);
   })
-  .get((req, res,next) => {
-    res.json(serializeFolder(res.folder))
+  .get( (req, res) => {
+    res.json(serializeFolder(res.folder));
   })
-  .delete((req, res, next) => {
-    FoldersService.deleteFolder(
-      req.app.get('db'),
-      req.params.id
-    )
-      .then(() => {
-        res.status(204).end()
+  .delete( (req, res, next) => {
+    const knexInstance = req.app.get('db');
+    const folderId = req.params.folderId;
+    FoldersService.deleteById(knexInstance, folderId)
+      .then( () => {
+        res.status(204).end();
       })
-      .catch(next)
+      .catch(next);
   })
-  .patch(jsonParser, (req, res, next) => {
-    const { folder_name } = req.body
-    const folderToUpdate = { folder_name }
-
-    if(!folder_name) {
+  .patch(jsonParser, ( req, res, next ) => {
+    const knexInstance = req.app.get('db');
+    const {title} = req.body;
+    const newFolderData = {title};
+    const folderId = req.params.folderId;
+    const numberOfValues = Object.values(newFolderData).filter(Boolean).length;
+    if (numberOfValues === 0) {
       return res.status(400).json({
-        error: {message: `Request body must contain 'folder_name'`}
-      })
+        error: {message: 'Request body must contain title.'}
+      });
     }
-
-    FoldersService.updateFolder(
-      req.app.get('db'),
-      req.params.id,
-      folderToUpdate
-    )
-      .then(() => {
-        res.status(204).end()
+    newFolderData.title = title(xss);
+    FoldersService.updateById(knexInstance, folderId, newFolderData)
+      .then( () => {
+        res.status(204).end();
       })
-      .catch(next)
-  })
+      .catch(next);
+  });
 
-module.exports = foldersRouter
+module.exports = FoldersRouter;
