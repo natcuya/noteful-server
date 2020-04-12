@@ -20,8 +20,8 @@ app.get('/', (req, res) => {
   res.send('Hello, world!');
 });
 
-app.use(FoldersRouter);
-app.use(NotesRouter);
+app.use('/api/folders', FoldersRouter);
+app.use('/api/folders', NotesRouter);
 
 app.use(function errorHandler(error, req, res) {
   let response;
