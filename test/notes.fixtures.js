@@ -1,51 +1,92 @@
 function makeNotesArray() {
-    return [
-      {
-        id: 1,
-        title: 'test note 1',
-        modified: '2029-01-22T16:28:32.615Z',
-        folder_id: 3,
-        content: 'test note 1 content',
-      },
-      {
-        id: 2,
-        title: 'test note 2',
-        modified: '2018-08-15T23:00:00.000Z',
-        folder_id: 1,
-        content: 'test note 2 content'
-      },
-      {
-        id: 3,
-        title: 'test note 3',
-        modified: '2019-01-04T00:00:00.000Z',
-        folder_id: 2,
-        content: 'test note 3 content'
-      }
-    ]
-  }
-  
-  function makeMaliciousNote() {
-    const maliciousNote = {
-      id: 911,
-      title: 'Naughty naughty very naughty <script>alert("xss");</script>',
-      modified: '1919-12-22T16:28:32.615Z',
-      folder_id: 2,
-      content: `Bad image <img src="https://url.to.file.which/does-not.exist">. But not <strong>all</strong> bad.`
-    }
-  
-    const expectedNote = {
-      ...maliciousNote,
-      title:'Naughty naughty very naughty &lt;script&gt;alert(\"xss\");&lt;/script&gt;',
-      content: `Bad image <img src="https://url.to.file.which/does-not.exist">. But not <strong>all</strong> bad.`
-    }
-  
-    return {
-      maliciousNote,
-      expectedNote
-    }
-  }
-  
-  module.exports = {
-    makeNotesArray,
-    makeMaliciousNote,
-  }
+  return [
+    {
+      id: 1,
+      title: 'Dogs1',
+      content: '1',
+      folder: 1
+    },
+    {
+      id: 2,
+      title: 'Dogs2',
+      content: '2',
+      folder: 1
+    },
+    {
+      id: 3,
+      title: 'Dogs3',
+      content: '3',
+      folder: 1
+    },
+    {
+      id: 4,
+      title: 'Dogs4',
+      content: '4',
+      folder: 1
+    },
+    {
+      id: 5,
+      title: 'Dogs5',
+      content: '5',
+      folder: 1
+    },
+    {
+      id: 6,
+      title: 'Cats1',
+      content: '6',
+      folder: 2
+    },
+    {
+      id: 7,
+      title: 'Cats2',
+      content: '7',
+      folder: 2
+    },
+    {
+      id: 8,
+      title: 'Cats3',
+      content: '8',
+      folder: 2
+    },
+    {
+      id: 9,
+      title: 'Cats4',
+      content: '9',
+      folder: 2
+    },
+    {
+      id: 10,
+      title: 'Cats5',
+      content: '10',
+      folder: 2
+    },
+    {
+      id: 11,
+      title: 'Cats6',
+      content: '11',
+      folder: 2
+    },
+    {
+      id: 12,
+      title: 'Spengler1',
+      content: '12',
+      folder: 3
+    },
+    {
+      id: 13,
+      title: 'Spengler2',
+      content: '13',
+      folder: 3
+    },
+    {
+      id: 14,
+      title: 'Spengler3',
+      content: '14',
+      folder: 3
+    },
+  ];
+}
+
+module.exports = {
+  makeNotesArray
+};

@@ -1,103 +1,99 @@
-const path = require('path')
-const express = require('express')
-const xss = require('xss')
-const NotesService = require('./notes-service')
+const path = require('path');
+const express = require('express');
+const NotesService = require('./notes-service.js');
 
-const notesRouter = express.Router()
-const jsonParser = express.json()
+const NotesRouter = express.Router();
+const jsonParser = express.json();
 
-const serializeNotes = note => ({
-  id: note.id,
+const xss = require('xss');
+
+const serializeNote = note => ({
+  id: Number(xss(note.id)),
   title: xss(note.title),
-  modified: note.modified,
-  folder_id: note.folder_id,
-  content: xss(note.content)
-})
+  content: xss(note.content),
+  folder: note.folder,
+  modified: new Date()
+});
 
-notesRouter
-  .route('/')
-  .get((req, res, next) => {
-    const knexInstance = req.app.get('db')
+NotesRouter.route('/notes')
+  .get( (req, res) => {
+    const knexInstance = req.app.get('db');
     NotesService.getAllNotes(knexInstance)
       .then(notes => {
-        res.json(notes.map(serializeNotes))
-      })
-      .catch(next)
+        res.json(notes.map(serializeNote));
+      });
   })
   .post(jsonParser, (req, res, next) => {
-    const { title, content, folder_id } = req.body
-    const newNote = { title, content, folder_id}
-
-    for (const [key, value] of Object.entries(newNote))
-      if(value == null)
+    const knexInstance = req.app.get('db');
+    const {title, content, folder, modified, date_created} = req.body;
+    const newNote = {title, content, folder, modified, date_created};
+    for (const [key, value] of Object.entries(newNote)) {
+      if (value === null) {
         return res.status(400).json({
-          error: { message: `Missing '${key}' in request body`}
-        })
-
-    NotesService.insertNote(
-      req.app.get('db'),
-      newNote
-    )
-      .then(note => {
-        res
-          .status(201)
-          .location(path.posix.join(req.originalUrl, `/${note.id}`))
-          .json(serializeNotes(note))
-      })
-      .catch(next)
-  })
-
-notesRouter
-  .route('/:id')
-  .all((req, res, next) => {
-    NotesService.getNoteById(
-      req.app.get('db'),
-      req.params.id
-    )
-      .then(note => {
-        if (!note) {
-          return res.status(404).json({
-            error: { message: `Note doesn't exist` }
-          })
-        }
-        res.note = note
-        next()
-      })
-      .catch(next)
-  })
-  .get((req, res, next) => {
-    res.json(serializeNotes(res.note))
-  })
-  .delete((req, res, next) => {
-    NotesService.deleteNote(
-      req.app.get('db'),
-      req.params.id
-    )
-      .then(() => {
-        res.status(204).end()
-      })
-      .catch(next)
-  })
-  .patch(jsonParser, (req, res, next) => {
-    const { title, content, folder_id } = req.body
-    const noteToUpdate = { title, content, folder_id}
-
-    const numOfVal = Object.values(noteToUpdate).filter(Boolean).length
-      if(numOfVal === 0 ) {
-        return res.status(400).json({
-          error: { message: `Request body must contain either 'title', 'content', or 'folder_id'`}
-        })
+          error: {message: `Missing ${key} in request body.`}
+        });
       }
-
-    NotesService.updateNote(
-      req.app.get('db'),
-      req.params.id,
-      noteToUpdate
-    )
-      .then(() => {
-        res.status(204).end()
+    }
+    NotesService.insertNote(knexInstance, newNote)
+      .then(note => {
+        res.status(201)
+          .location(path.posix.join(req.originalUrl, `/${note.id}`))
+          .json(serializeNote);
       })
-      .catch(next)
+      .catch(next);
+  });
+
+NotesRouter.route('/notes/:noteId')
+  .all( (req, res, next) => {
+    const knexInstance = req.app.get('db');
+    const noteId = req.params.noteId;
+    NotesService.getById(knexInstance, noteId)
+      .then(note => {
+        if(!note) {
+          return res.status(404).json({
+            error: {message: 'Note does not exist.'}
+          });
+        }
+        res.note = note;
+        next();
+      })
+      .catch(next);
   })
-  
-module.exports = notesRouter
+  .get( (req, res ) => {
+    res.json(serializeNote(res.note));
+  })
+  .delete( (req, res, next) => {
+    const knexInstance = req.app.get('db');
+    const noteId = req.params.noteId;
+    NotesService.deleteById(knexInstance, noteId)
+      .then( () => {
+        res.status(204).end();
+      })
+      .catch(next);
+  })
+  .patch(jsonParser, ( req, res, next ) => {
+    const knexInstance = req.app.get('db');
+    const {title, content, folder } = req.body;
+    const newNoteData = {title, content, folder};
+    const noteId = req.params.noteId;
+    const numberOfValues = Object.values(newNoteData).filter(Boolean).length;
+    if (numberOfValues === 0) {
+      res.status(400).json({
+        error: {message: 'Request body must contain title, content, or folderID.'}
+      });
+    }
+    if (title) {
+      newNoteData.title = xss(title);
+    }
+    if (content) {
+      newNoteData.content = xss(content);
+    }
+
+    NotesService.updateById(knexInstance, noteId, newNoteData)
+      .then( () => {
+        res.status(204).end();
+      })
+      .catch(next);
+  });
+
+module.exports = NotesRouter;

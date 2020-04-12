@@ -1,251 +1,105 @@
-const knex = require('knex')
-const app = require('../src/app')
-const { makeFoldersArray, makeMaliciousFolder } = require('./folders.fixtures')
+const { expect } = require('chai');
+const knex = require('knex');
+const app = require('../src/app');
+const { makeFoldersArray } = require('./folders.fixtures');
 
-describe('Folders Endpoints', function() {
-  let db
-  
-  before('make knex instance', () => {
+describe('folders endpoint', function() {
+  let db;
+
+  before('make new knex instance', () => {
     db = knex({
       client: 'pg',
-      connection: process.env.TEST_DATABASE_URL,
-    })
-    app.set('db', db)
-  })
+      connection: process.env.TEST_DATABASE_URL
+    });
+    app.set('db', db);
+  });
 
-  after('disconnect from db', () => db.destroy())
+  after('disconnect from database', () => db.destroy() );
 
-  before('clean the table', () => db.raw('TRUNCATE folders, notes RESTART IDENTITY CASCADE'))
+  before('clean the table', () => db.raw('TRUNCATE notes, folders RESTART IDENTITY CASCADE'));
 
-  afterEach('cleanup', () => db.raw('TRUNCATE folders, notes RESTART IDENTITY CASCADE'))
+  afterEach('cleanup after each test', () => db.raw('TRUNCATE notes, folders RESTART IDENTITY CASCADE'));
 
-  describe(`GET /api/folder`, () => {
-    context(`Given no folders`, () => {
-      it (`responds with 200 and an empty list`, () => {
+  describe('GET /folders', () => {
+    context('given no folders', () => {
+      it('responds 200 and an empty array', () => {
         return supertest(app)
-          .get('/api/folders')
-          .expect(200, [])
-      })
-    })
-    
-    context('Given there are folders in the database', () => {
+          .get('/folders')
+          .expect(200, []);
+      });
+    });
+    context('given folders exist', () => {
       const testFolders = makeFoldersArray();
-      
-      beforeEach('insert folder', () => {
-        return db
-          .into('folders')
-          .insert(testFolders)
-      })
-      
-      it('responds with 200 and all of the folders', () => {
-        return supertest(app)
-        .get('/api/folders')
-        .expect(200, testFolders)
-      })
-    })
-
-    context('Given malicious XSS content', () => {
-      const { maliciousFolder, expectedFolder } = makeMaliciousFolder()
-
-      beforeEach('insert malicious folder', () => {
-        return db
-          .into('folders')
-          .insert(maliciousFolder)
-      })
-
-      it('removes malicious content', () => {
-        return supertest(app)
-          .get('/api/folders')
-          .expect(200)
-          .expect(r => {
-            expect(r.body[0].folder_name).to.eql(expectedFolder.folder_name)
-          })
-      })
-    })
-  })
-
-  describe('GET /api/folders/:id', () => {
-    context(`Given no folders`, () => {
-      it('responds with 404', () => {
-        const folderId = 123456
-        return supertest(app)
-          .get(`/api/folders/${folderId}`)
-          .expect(404, { error: { message: `Folder doesn't exist` } })
-      })
-    })
-
-    context('Given there are folders in the DB', () => {
-      const testFolders = makeFoldersArray()
-
       beforeEach('insert folders', () => {
-        return db
-          .into('folders')
-          .insert(testFolders)
-      })
-
-      it('responds with 200 and the specified folder', () => {
-        const id = 2
-        const expectedFolder = testFolders[id - 1]
+        return db.into('folders')
+          .insert(testFolders);
+      });
+      it('responds 200 and returns array of folders', () => {
         return supertest(app)
-          .get(`/api/folders/${id}`)
-          .expect(200, expectedFolder)
-      })
-    })
-
-    context('Given XSS content', () => {
-      const {maliciousFolder, expectedFolder} = makeMaliciousFolder()
-
-      beforeEach('Insert malicious folder', () => {
-        return db
-          .into('folders')
-          .insert(maliciousFolder)
-      })
-      
-      it('Removes XSS attack content', () => {
-        return supertest(app)
-          .get(`/api/folders/${maliciousFolder.id}`)
-          .expect(200)
-          .expect(r => {
-            expect(r.body.folder_name).to.eql(expectedFolder.folder_name)
-          })
-      })
-    })
-  })
-
-  describe('POST /api/folders', () => {
-    context('Given a valid folder', () => {
-      const newFolder = {
-        folder_name: 'New Folder'
-      }
-
-      it(`responds with 201 adds the folder to the DB`, () => {
-        return supertest(app)
-          .post('/api/folders')
-          .send(newFolder)
-          .expect(201)
-          .expect(res => {
-            expect(res.body.folder_name).to.eql(newFolder.folder_name)
-            expect(res.body).to.have.property('id')
-            expect(res.headers.location).to.eql(`/api/folders/${res.body.id}`)
-          })
-          .then(res => 
-            supertest(app)
-              .get(`/api/folders/${res.body.id}`)
-              .expect(res.body)
-          )
-      })
-    })
-    context('Given an invalid folder', () => {
-      const invalidFolder = {}
-
-      it('responds with 400 and an error message when folder_name is missing', () => {
-        return supertest(app)
-          .post(`/api/folders`)
-          .send(invalidFolder)
-          .expect(400, {
-            error : { message: `Missing folder_name in request body`}
-          })
-      })
-    })
-
-    context('Given malicious XSS content', () => {
-      const {maliciousFolder, expectedFolder} = makeMaliciousFolder()
-      it('removes XSS content', () => {
-        return supertest(app)
-          .post(`/api/folders`)
-          .send(maliciousFolder)
-          .expect(201)
-          .expect(res => {
-            expect(res.body.folder_name).to.eql(expectedFolder.folder_name)
-          })
-      })
-    })  
-  })
-
-  describe(`DELETE /api/folders/:id`, () => {
-    context(`Given no folders`, () => {
-      it(`rsponds with 404`, () => {
-        const id = 123456
-        return supertest(app)
-          .delete(`/api/folders/${id}`)
-          .expect(404, { error: { message: `Folder doesn't exist`}})
-      })
-    })
-
-    context(`Given that are folders in the DB`, () => {
-      const testFolders = makeFoldersArray()
-
-      beforeEach(`insert folders`, () => {
-        return db
-          .into('folders')
-          .insert(testFolders)
-      })
-
-      it('reponds with 204 and removes the folder', () => {
-        const id = 2 
-        const expected = testFolders.filter(folder => folder.id !== id)
-        return supertest(app)
-          .delete(`/api/folders/${id}`)
-          .expect(204)
-          .then(res => 
-            supertest(app)
-              .get(`/api/folders`)
-              .expect(expected)
-          )
-      })
-    })
-  })
-
-  describe(`PATCH /api/folder/:id`, () => {
-    context('Given no folders', () => {
-      it('responds with 404', () => {
-        const id = 123456
-        return supertest(app)
-          .patch(`/api/folders/${id}`)
-          .expect(404, { error: { message: `Folder doesn't exist` } })
-      })
-    })
-
-    context('Given there are folders in the DB', () => {
-      const testFolders =  makeFoldersArray()
-
+          .get('/folders')
+          .expect(200, testFolders);
+      });
+    });
+    context('given an XSS attack folder', () => {
+      const maliciousFolder = {
+        title: 'Naughty naughty very naughty <script>alert("xss");</script>',
+        id: 1,
+      };
+      const expectedFolder = {
+        title: 'Naughty naughty very naughty &lt;script&gt;alert("xss");&lt;/script&gt;',
+        id: 1,
+      };
       beforeEach('insert folders', () => {
-        return db
-          .into('folders')
-          .insert(testFolders)
-      })
-
-      it('responds with 204 and updates the folder', () => {
-        const id = 2
-        const updateFolder = {
-          folder_name: 'updated folder name'
-        }
-        const expectedFolder = {
-          ...testFolders[id - 1],
-          ...updateFolder
-        }
+        return db.into('folders')
+          .insert(maliciousFolder);
+      });
+      it('malicious folder inserted, return sanitized folder', () => {
         return supertest(app)
-          .patch(`/api/folders/${id}`)
-          .send(updateFolder)
-          .expect(204)
-          .then(() => 
-            supertest(app)
-              .get(`/api/folders/${id}`)
-              .expect(expectedFolder)
-          )
-      })
-
-      it('responds with 400 when folder_name is missing', () => {
-        const id = 2
-        const invalidFolder = {}
-
+          .get('/folders')
+          .expect(200, [expectedFolder]);
+      });
+    });
+  });
+  describe('GET /folders/:folderId', () => {
+    context('given folderId does not exist', () => {
+      it('responds 404', () => {
         return supertest(app)
-          .patch(`/api/folders/${id}`)
-          .send(invalidFolder)
-          .expect(400, {
-            error: {message: `Request body must contain 'folder_name'`}
-          })
-      })
-    })
-  })
-})
+          .get('/folders/999')
+          .expect(404);
+      });
+    });
+    context('given folderId exists', () => {
+      const testFolders = makeFoldersArray();
+      const expectedId = 2;
+      const expectedFolder = testFolders[expectedId - 1];
+      beforeEach('insert test folders', () => {
+        return db.into('folders').insert(testFolders);
+      });
+      it('given folderId exists, respond with 200 and correct folder', () => {
+        return supertest(app)
+          .get(`/folders/${expectedId}`)
+          .expect(200, expectedFolder);
+      });
+    });
+    context('given malicious attack folder, sanitize and return', () => {
+      const maliciousFolder = {
+        title: 'Naughty naughty very naughty <script>alert("xss");</script>',
+        id: 1,
+      };
+      const expectedFolder = {
+        title: 'Naughty naughty very naughty &lt;script&gt;alert("xss");&lt;/script&gt;',
+        id: 1,
+      };
+      beforeEach('insert folders', () => {
+        return db.into('folders')
+          .insert(maliciousFolder);
+      });
+      it('malicious folder inserted, return sanitized folder', () => {
+        return supertest(app)
+          .get('/folders/1')
+          .expect(200, expectedFolder);
+      });
+
+    });
+  });
+});
