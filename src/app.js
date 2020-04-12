@@ -21,7 +21,7 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/folders', FoldersRouter);
-app.use('/api/folders', NotesRouter);
+app.use('/api/notes', NotesRouter);
 
 app.use(function errorHandler(error, req, res) {
   let response;
