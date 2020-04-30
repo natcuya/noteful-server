@@ -8,7 +8,7 @@ const jsonParser = express.json();
 const xss = require('xss');
 
 const serializeFolder = folder => ({
-  id: Number(xss(folder.id)),
+  id: folder.id,
   title: xss(folder.title),
 });
 

@@ -8,11 +8,11 @@ const jsonParser = express.json();
 const xss = require('xss');
 
 const serializeNote = note => ({
-  id: Number(xss(note.id)),
+  id: note.id,
   title: xss(note.title),
   content: xss(note.content),
   folder: note.folder,
-  modified: new Date()
+  modified: note.modified
 });
 
 NotesRouter.route('/notes')
@@ -37,9 +37,10 @@ NotesRouter.route('/notes')
     NotesService.insertNote(knexInstance, newNote)
       .then(note => {
         console.log("created note:", note);
+        
         res.status(200)
           .location(path.posix.join(req.originalUrl, `/${note.id}`))
-          .json(serializeNote);
+          .json(note);
       })
       .catch(next);
   });
