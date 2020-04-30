@@ -37,7 +37,7 @@ NotesRouter.route('/notes')
     NotesService.insertNote(knexInstance, newNote)
       .then(note => {
         console.log("created note:", note);
-        res.status(201)
+        res.status(200)
           .location(path.posix.join(req.originalUrl, `/${note.id}`))
           .json(serializeNote);
       })
